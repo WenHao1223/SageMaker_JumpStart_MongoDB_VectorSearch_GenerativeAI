@@ -18,6 +18,8 @@ This repository demonstrates how to harness the power of state-of-the-art AI mod
 
 ### MongoDB Atlas Setup
 
+Create a free MongoDB Atlas cluster by following the instructions in the link.  Setup the Database access and Network access.
+
 ### Setup the Amazon Lex
 
 ### Vector Data Store
