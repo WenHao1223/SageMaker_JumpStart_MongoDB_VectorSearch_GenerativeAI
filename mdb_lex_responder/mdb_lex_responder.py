@@ -1,5 +1,5 @@
 import json
-from mdb_context_retriever import MDBContextRetriever
+from mongodb_retriever import MDBContextRetriever
 from langchain.chains import RetrievalQA
 from langchain import OpenAI
 from langchain.prompts import PromptTemplate
@@ -7,7 +7,7 @@ from langchain import SagemakerEndpoint
 from langchain.llms.sagemaker_endpoint import LLMContentHandler
 import json
 import os
-from llm_with_mdb_semantic_context import build_chain, run_chain
+from langchain_mongodb import build_chain, run_chain
 
 # import requests
 
