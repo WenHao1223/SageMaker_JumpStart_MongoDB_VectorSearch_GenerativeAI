@@ -1,35 +1,19 @@
-# Generative AI Solution with RAG model for Enterprise Chatbot with MongoDB Atlas Vector Search
+# Generative AI Solution: Lambda function to vectorize data
 
 ## Introduction
 
-This repository demonstrates how to harness the power of state-of-the-art AI models from SageMaker JumpStart and combine it with MongoDB's cutting-edge vector search capabilities to create innovative solutions that push the boundaries of data-driven applications
-
-## MongoDB Atlas
-
-
-## Amazon SageMaker AI models - Jump Start
-
-## Reference Architecture 
-
+This repository demonstrates how to vectorize the data using the Amazon SageMaker Jumpstart models.
 
 ## Prerequisite
 
-## Steps for implementation
+  [sam cli](https://docs.aws.amazon.com/serverless-application-model/latest/developerguide/install-sam-cli.html)
 
-### MongoDB Atlas Setup
+## Steps
 
-Create a free MongoDB Atlas cluster by following the instructions in the link.  Setup the Database access and Network access.
+    git clone https://github.com/mongodb-partners/SageMaker_JumpStart_MongoDB_VectorSearch_GenerativeAI/
 
-### Setup the Amazon Lex
+    sam build
 
-### Vector Data Store
+    sam package
 
-### Embedding Model
-
-### Vector Search
-
-### RAG model
-
-## Testing
-
-## Conclusion
+    sam deploy
