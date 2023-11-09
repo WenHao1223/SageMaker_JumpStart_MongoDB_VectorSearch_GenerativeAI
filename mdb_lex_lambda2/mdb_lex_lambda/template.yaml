@@ -8,7 +8,7 @@ Description: >
 # More info about Globals: https://github.com/awslabs/serverless-application-model/blob/master/docs/globals.rst
 Globals:
   Function:
-    Timeout: 3
+    Timeout: 30
     MemorySize: 128
     Tracing: Active
   Api:
@@ -18,6 +18,18 @@ Resources:
   HelloWorldFunction:
     Type: AWS::Serverless::Function # More info about Function Resource: https://github.com/awslabs/serverless-application-model/blob/master/versions/2016-10-31.md#awsserverlessfunction
     Properties:
+      Environment: 
+        Variables:
+          LLM_ENDPOINT: "jumpstart-dft-hf-text2text-flan-t5-xl"
+          AWS_REGION1: "us-east-1"
+          ATLAS_URI: "mongodb+srv://<USERNAME>:<PASSWORD>@<SERVER>.mongodb.net/?retryWrites=true&w=majority"
+          MONGO_DB: "sample_mflix"
+          MONGO_COLLECTION: "movies"
+          MONGO_INDEX: "vector-index"
+          FIELD_NAME_TO_BE_VECTORIZED: "fullplot"
+          VECTORIZED_FIELD_NAME: "egVector"
+          EMBEDDING_ENDPOINT_NAME: "jumpstart-dft-hf-textembedding-all-minilm-l6-v2"
+          SEARCH_VARIABLE: "satisfied"
       CodeUri: hello_world/
       Handler: app.lambda_handler
       Runtime: python3.9

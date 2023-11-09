@@ -1,7 +1,7 @@
 from langchain.chains import RetrievalQA
 from mongodb_retriever import MDBContextRetriever
 from langchain.prompts import PromptTemplate
-from langchain import SagemakerEndpoint
+from langchain.llms import SagemakerEndpoint
 from langchain.llms.sagemaker_endpoint import LLMContentHandler
 import json
 import os
@@ -10,8 +10,9 @@ def build_chain():
 
     mongodb_uri = os.environ["ATLAS_URI"]
     endpoint_name = os.environ["LLM_ENDPOINT"]
-    # aws_region = os.environ["AWS_REGION"]
-    aws_region = "us-east-1"
+    aws_region = os.environ["AWS_REGION1"]
+
+    print("AWS Region: " + str(aws_region))
 
     class ContentHandler(LLMContentHandler):
         content_type = "application/json"

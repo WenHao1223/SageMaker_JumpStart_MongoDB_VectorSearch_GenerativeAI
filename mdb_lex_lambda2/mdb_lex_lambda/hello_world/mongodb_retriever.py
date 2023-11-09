@@ -6,7 +6,16 @@ from typing import Dict, List
 from langchain.embeddings import SagemakerEndpointEmbeddings
 from langchain.embeddings.sagemaker_endpoint import EmbeddingsContentHandler
 import json
+import os
 
+# retrieve the variables from template.yaml
+mongo_db = os.environ["MONGO_DB"]
+aws_region = os.environ["AWS_REGION1"]
+embedding_endpoint_name = os.environ["EMBEDDING_ENDPOINT_NAME"]
+mongo_collection = os.environ["MONGO_COLLECTION"]
+mongo_index = os.environ["MONGO_INDEX"]
+
+print("MongoDB : " + str(mongo_db))
 
 class ContentHandler(EmbeddingsContentHandler):
     content_type = "application/json"
@@ -25,8 +34,8 @@ content_handler = ContentHandler()
 
 
 embeddings = SagemakerEndpointEmbeddings(
-    endpoint_name="jumpstart-dft-hf-textembedding-all-minilm-l6-v2",
-    region_name="us-east-1",
+    endpoint_name=embedding_endpoint_name,
+    region_name=aws_region,
     content_handler=content_handler,
 )
 
@@ -50,8 +59,8 @@ class MDBContextRetriever(BaseRetriever):
         self.return_source_documents = return_source_documents
         self.client = MongoClient(mongodb_uri)
 
-        db_name = "sample_mflix"
-        collection_name = "movies"
+        db_name = mongo_db
+        collection_name = mongo_collection
         collection = self.client[db_name][collection_name]
         index_name = "vector-index"
         self.mdb_vectorestore = MongoDBAtlasVectorSearch(
