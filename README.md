@@ -7,6 +7,8 @@ This repository demonstrates how to vectorize the data using the Amazon SageMake
 ## Prerequisite
 
   [sam cli](https://docs.aws.amazon.com/serverless-application-model/latest/developerguide/install-sam-cli.html)
+  
+  
   [MongoDB Atlas Databse](https://www.mongodb.com/docs/atlas/getting-started/) with [Sample Data](https://www.mongodb.com/docs/atlas/sample-data/) 
 
 ## Steps
