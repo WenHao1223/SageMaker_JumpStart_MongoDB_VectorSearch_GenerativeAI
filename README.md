@@ -10,10 +10,16 @@ This repository demonstrates how to vectorize the data using the Amazon SageMake
 
 ## Steps
 
-    git clone https://github.com/mongodb-partners/SageMaker_JumpStart_MongoDB_VectorSearch_GenerativeAI/
+### Generate Vector Embeddings
+
+### Create Index
+
+
+### Build and Deploy
 
     sam build
 
     sam package
 
     sam deploy
+
