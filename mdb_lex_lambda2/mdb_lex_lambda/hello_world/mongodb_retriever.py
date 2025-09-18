@@ -62,6 +62,14 @@ class MDBContextRetriever(BaseRetriever):
 
     def _get_relevant_documents(self, query: str) -> List[Document]:
         """Run search in MongoDB Atlas and get top k documents"""
+        # Check if collection has documents
+        doc_count = self.collection.count_documents({})
+        print(f"Collection has {doc_count} documents")
+        
+        if doc_count == 0:
+            print("No documents in collection")
+            return []
+        
         # Generate embedding for the query
         query_embedding = self.embeddings.embed_query(query)
         

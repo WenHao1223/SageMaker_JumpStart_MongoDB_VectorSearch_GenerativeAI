@@ -66,14 +66,20 @@ for document in documents:
 
  ##########################################################################
  # This code to be used if the schema is flat    
-    if field_name_to_be_vectorized in document and vectorized_field_name not in document:
+    if field_name_to_be_vectorized in document:
         payload = {"inputs": [document[field_name_to_be_vectorized]]}
         query_response = query_endpoint_with_json_payload(json.dumps(payload).encode('utf-8'))
         embeddings = parse_response_multiple_texts(query_response)
         # print("embeddings: " + str(embeddings[0]))
 
+        # Flatten the embedding to ensure it's a simple array
+        vector = embeddings[0]
+        if isinstance(vector, list) and len(vector) > 0 and isinstance(vector[0], list):
+            # If nested, flatten to get the actual vector
+            vector = vector[0]
+        
         # update the document
-        update = {'$set': {vectorized_field_name :  embeddings[0]}}
+        update = {'$set': {vectorized_field_name : vector}}
         collection.update_one(query, update)
 
     if i % 100 == 0:
@@ -140,3 +146,11 @@ response = collection.aggregate([
         }
     }
 ])
+
+print("\n=== Test Search Results ===")
+for result in response:
+    print(f"Title: {result.get('title', 'N/A')}")
+    print(f"Score: {result.get('score', 'N/A')}")
+    print(f"Plot: {result.get(field_name_to_be_vectorized, 'N/A')[:100]}...")
+    print("---")
+print("Test completed.")
