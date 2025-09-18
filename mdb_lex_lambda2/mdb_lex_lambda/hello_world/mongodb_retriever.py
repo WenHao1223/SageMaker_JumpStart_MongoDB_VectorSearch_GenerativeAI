@@ -61,62 +61,107 @@ class MDBContextRetriever(BaseRetriever):
         self.embeddings = embeddings
 
     def _get_relevant_documents(self, query: str) -> List[Document]:
-        """Run search in MongoDB Atlas and get top k documents"""
-        # Check if collection has documents
+        """Hybrid search: keyword search first, then semantic search"""
         doc_count = self.collection.count_documents({})
+        print(f"\n{'='*60}")
+        print(f"🔍 HYBRID SEARCH STARTED")
+        print(f"Query: '{query}'")
         print(f"Collection has {doc_count} documents")
+        print(f"{'='*60}")
         
         if doc_count == 0:
-            print("No documents in collection")
             return []
         
-        # Generate embedding for the query
-        query_embedding = self.embeddings.embed_query(query)
+        # Step 1: Try keyword search first
+        print(f"\n📝 STEP 1: KEYWORD SEARCH")
+        print(f"{'-'*40}")
+        keyword_docs = self._keyword_search(query)
+        if keyword_docs:
+            print(f"✅ Keyword search SUCCESS: {len(keyword_docs)} documents found")
+            return keyword_docs
         
-        # Debug the embedding structure
-        # print(f"Raw embedding type: {type(query_embedding)}")
-        # print(f"Raw embedding: {query_embedding[:2] if hasattr(query_embedding, '__len__') else query_embedding}")
-        
-        # Handle nested array structures - flatten completely
-        def flatten_embedding(embedding):
-            if isinstance(embedding, list):
-                if len(embedding) == 1 and isinstance(embedding[0], list):
-                    return flatten_embedding(embedding[0])
-                elif all(isinstance(x, (int, float)) for x in embedding):
-                    return embedding
-                elif len(embedding) > 0 and isinstance(embedding[0], list):
-                    return flatten_embedding(embedding[0])
-            return embedding
-        
-        query_embedding = flatten_embedding(query_embedding)
-        
-        # Convert all elements to float
+        # Step 2: Fall back to semantic search
+        print(f"❌ Keyword search returned 0 results")
+        print(f"\n🧠 STEP 2: SEMANTIC SEARCH")
+        print(f"{'-'*40}")
+        return self._semantic_search(query)
+    
+    def _keyword_search(self, query: str) -> List[Document]:
+        """MongoDB Atlas text search"""
         try:
-            if not isinstance(query_embedding, list):
-                return self._simple_search(query)
-            query_embedding = [float(x) for x in query_embedding]
-            print(f"Query embedding length: {len(query_embedding)}")
+            pipeline = [{
+                "$search": {
+                    "index": mongo_index,
+                    "text": {
+                        "query": query,
+                        "path": {"wildcard": "*"}
+                    }
+                }
+            }, {
+                "$project": {
+                    "_id": 1,
+                    "fullplot": 1,
+                    "title": 1,
+                    "genres": 1,
+                    "cast": 1,
+                    "year": 1,
+                    "score": {"$meta": "searchScore"}
+                }
+            }, {
+                "$limit": self.k
+            }]
             
-            if len(query_embedding) == 0:
-                return self._simple_search(query)
-                
-        except (ValueError, TypeError) as e:
-            print(f"Error converting embedding to float: {e}")
-            return self._simple_search(query)
-        
-        # Use exact $vectorSearch syntax matching MongoDB Atlas Search Tester
-        pipeline = [
-            {
+            print(f"Using MongoDB Atlas Text Search with index: {mongo_index}")
+            results = list(self.collection.aggregate(pipeline))
+            docs = []
+            for i, result in enumerate(results, 1):
+                score = result.get("score", 0)
+                print(f"  📄 #{i} [{score:.4f}] {result.get('title')} ({result.get('year', 'N/A')})")
+                doc = Document(
+                    page_content=result.get("fullplot", ""),
+                    metadata={
+                        "title": result.get("title", ""),
+                        "score": score,
+                        "search_type": "KEYWORD",
+                        "_id": str(result.get("_id", ""))
+                    }
+                )
+                docs.append(doc)
+            return docs
+        except Exception as e:
+            print(f"❌ Keyword search failed: {e}")
+            return []
+    
+    def _semantic_search(self, query: str) -> List[Document]:
+        """Vector/semantic search"""
+        try:
+            query_embedding = self.embeddings.embed_query(query)
+            
+            # Flatten embedding
+            def flatten_embedding(embedding):
+                if isinstance(embedding, list):
+                    if len(embedding) == 1 and isinstance(embedding[0], list):
+                        return flatten_embedding(embedding[0])
+                    elif all(isinstance(x, (int, float)) for x in embedding):
+                        return embedding
+                    elif len(embedding) > 0 and isinstance(embedding[0], list):
+                        return flatten_embedding(embedding[0])
+                return embedding
+            
+            query_embedding = flatten_embedding(query_embedding)
+            query_embedding = [float(x) for x in query_embedding]
+            print(f"Generated embedding vector: {len(query_embedding)} dimensions")
+            
+            pipeline = [{
                 "$vectorSearch": {
                     "index": mongo_index,
                     "path": os.getenv("VECTORIZED_FIELD_NAME"),
                     "queryVector": query_embedding,
-                    "numCandidates": 150,  # Match Atlas Search Tester default
+                    "numCandidates": 150,
                     "limit": self.k,
-                    "filter": {}  # Empty filter like Atlas Search Tester
+                    "filter": {}
                 }
-            },
-            {
+            }, {
                 "$project": {
                     "_id": 1,
                     "fullplot": 1,
@@ -126,80 +171,44 @@ class MDBContextRetriever(BaseRetriever):
                     "year": 1,
                     "score": {"$meta": "vectorSearchScore"}
                 }
-            }
-        ]
-        
-        try:
-            print(f"Using index: {mongo_index}")
-            # print(f"Pipeline: {pipeline}")
+            }]
+            
+            print(f"Using MongoDB Vector Search with index: {mongo_index}")
             results = list(self.collection.aggregate(pipeline))
             docs = []
-            for result in results:
-                raw_score = result.get("score", 0)
-                print(f"Raw result: {result.get('title')} - Score: {raw_score}")
+            for i, result in enumerate(results, 1):
+                score = result.get("score", 0)
+                print(f"  🎯 #{i} [{score:.4f}] {result.get('title')} ({result.get('year', 'N/A')})")
                 doc = Document(
                     page_content=result.get("fullplot", ""),
                     metadata={
                         "title": result.get("title", ""),
-                        "score": raw_score,
+                        "score": score,
+                        "search_type": "SEMANTIC",
                         "_id": str(result.get("_id", ""))
                     }
                 )
                 docs.append(doc)
-            print(f"Vector search found {len(docs)} documents")
-            if len(docs) == 0:
-                print("Vector search returned 0 results")
-                return self._simple_search(query)
-            return docs
-        except Exception as e:
-            print(f"Vector search failed: {e}")
-            print("Trying fallback knnBeta syntax...")
-            # Fallback to knnBeta
-            fallback_pipeline = [
-                {
-                    "$search": {
-                        "index": mongo_index,
-                        "knnBeta": {
-                            "vector": query_embedding,
-                            "path": os.getenv("VECTORIZED_FIELD_NAME"),
-                            "k": self.k
-                        }
-                    }
-                },
-                {
-                    "$project": {
-                        "_id": 1,
-                        "fullplot": 1,
-                        "title": 1,
-                        "score": {"$meta": "searchScore"}
-                    }
-                }
-            ]
-            try:
-                results = list(self.collection.aggregate(fallback_pipeline))
-                docs = []
-                for result in results:
-                    raw_score = result.get("score", 0)
-                    print(f"Fallback result: {result.get('title')} - Score: {raw_score}")
-                    doc = Document(
-                        page_content=result.get("fullplot", ""),
-                        metadata={
-                            "title": result.get("title", ""),
-                            "score": raw_score,
-                            "_id": str(result.get("_id", ""))
-                        }
-                    )
-                    docs.append(doc)
+            
+            if docs:
+                print(f"✅ Semantic search SUCCESS: {len(docs)} documents found")
                 return docs
-            except Exception as e2:
-                print(f"Fallback also failed: {e2}")
+            else:
+                print(f"❌ Semantic search returned 0 results")
+                print(f"\n🔧 STEP 3: SIMPLE FALLBACK SEARCH")
+                print(f"{'-'*40}")
                 return self._simple_search(query)
+        except Exception as e:
+            print(f"❌ Semantic search failed: {e}")
+            print(f"\n🔧 STEP 3: SIMPLE FALLBACK SEARCH")
+            print(f"{'-'*40}")
+            return self._simple_search(query)
 
     def _simple_search(self, query: str) -> List[Document]:
-        """Simple search fallback"""
+        """Simple regex search fallback"""
         try:
-            # Try different search strategies
             search_terms = query.lower().split()
+            print(f"Using MongoDB regex search for terms: {search_terms}")
             
             # First try: search for any of the terms in fullplot
             or_conditions = [{"fullplot": {"$regex": term, "$options": "i"}} for term in search_terms]
@@ -223,23 +232,32 @@ class MDBContextRetriever(BaseRetriever):
                 results = list(self.collection.find().limit(self.k))
             
             docs = []
-            for result in results:
+            for i, result in enumerate(results, 1):
+                print(f"  🔍 #{i} [1.0000] {result.get('title', 'No title')} ({result.get('year', 'N/A')})")
                 doc = Document(
                     page_content=result.get("fullplot", result.get("plot", "")),
                     metadata={
                         "title": result.get("title", ""),
                         "score": 1.0,
+                        "search_type": "SIMPLE",
                         "_id": str(result.get("_id", ""))
                     }
                 )
                 docs.append(doc)
-                print(f"Found: {result.get('title', 'No title')} - {result.get('fullplot', '')[:100]}...")
-            print(f"Fallback search found {len(docs)} documents")
+            
+            if docs:
+                print(f"✅ Simple search SUCCESS: {len(docs)} documents found")
+            else:
+                print(f"❌ All search methods failed")
             return docs
         except Exception as e:
-            print(f"Fallback search failed: {e}")
+            print(f"❌ Simple search failed: {e}")
             return []
 
+    def invoke(self, query: str) -> List[Document]:
+        """Invoke the retriever with a query string"""
+        return self._get_relevant_documents(query)
+    
     async def _aget_relevant_documents(self, query: str) -> List[Document]:
         return self._get_relevant_documents(query)
 

@@ -120,7 +120,15 @@ def run_chain(chain, prompt: str, history=[]):
             
             if docs:
                 # Create a simple summary from the documents
-                context = "\n".join([f"Title: {doc.metadata.get('title', 'Unknown')}\nContent: {doc.page_content[:200]}..." for doc in docs[:3]])
+                context_parts = []
+                for doc in docs[:3]:
+                    search_type = doc.metadata.get('search_type', 'UNKNOWN')
+                    title = doc.metadata.get('title', 'Unknown')
+                    score = doc.metadata.get('score', 0)
+                    content = doc.page_content[:200]
+                    context_parts.append(f"[{search_type}] {title} (Score: {score:.4f})\n{content}...")
+                
+                context = "\n\n".join(context_parts)
                 answer = f"Based on your query '{prompt}', I found the following relevant information:\n\n{context}"
             else:
                 answer = f"No relevant documents found for '{prompt}'."
@@ -136,12 +144,47 @@ def run_chain(chain, prompt: str, history=[]):
             }
 
 if __name__ == "__main__":
-
-    input_text = "Remember the movie where the kid fight with other and they won?"
-    # input_text = "describe fish that lives in the ocean"
+    # Test prompts for movies.json dataset
+    test_prompts = [
+        # Keyword search tests (should find exact matches)
+        "Robin Hood",              # Exact title - should use KEYWORD
+        "Buster Keaton",           # Actor name - should use KEYWORD  
+        "train robbery",           # Plot keywords - should use KEYWORD
+        
+        # Semantic search tests (conceptual matches)
+        "adventure story",         # Concept - should use SEMANTIC
+        "funny movie",             # Concept - should use SEMANTIC
+        "animated cartoon",        # Concept - should use SEMANTIC
+        
+        # Edge cases
+        "clown performance",       # Should find "He Who Gets Slapped"
+        "dinosaur animation",      # Should find "Gertie the Dinosaur"
+        "biblical story",          # Should find "Salomè"
+    ]
+    
+    # Test single prompt or run all
+    input_text = "Robin Hood"  # Change this to test different prompts
+    # input_text = test_prompts[0]  # Uncomment to cycle through tests
+    
     chain = build_chain()
     result = run_chain(chain, input_text)
 
-    print("Input text is:",input_text)
-    print("LLM generated text is:",result['answer'])
+    print(f"\n{'='*80}")
+    print(f"🎬 FINAL RESULTS")
+    print(f"{'='*80}")
+    print(f"Query: '{input_text}'")
+    print(f"\n📝 RETRIEVED DOCUMENTS:")
+    
+    for i, doc in enumerate(result.get('source_documents', []), 1):
+        search_type = doc.metadata.get('search_type', 'UNKNOWN')
+        score = doc.metadata.get('score', 0)
+        title = doc.metadata.get('title', 'Unknown')
+        
+        icon = "📄" if search_type == "KEYWORD" else "🎯" if search_type == "SEMANTIC" else "🔍"
+        print(f"  {icon} #{i} [{search_type}] {title} (Score: {score:.4f})")
+    
+    print(f"\n🤖 AI RESPONSE:")
+    print(f"{'-'*60}")
+    print(result['answer'])
+    print(f"{'='*80}")
 
