@@ -12,15 +12,15 @@ def test_vectorization_status():
     collection = client["my_mflix"]["movies"]
     
     total_docs = collection.count_documents({})
-    vectorized_docs = collection.count_documents({"egVector": {"$exists": True}})
+    vectorized_docs = collection.count_documents({os.getenv("VECTORIZED_FIELD_NAME"): {"$exists": True}})
     
     print(f"Total documents: {total_docs}")
     print(f"Vectorized documents: {vectorized_docs}")
     print(f"Progress: {vectorized_docs/total_docs*100:.1f}%")
     
     if vectorized_docs > 0:
-        sample = collection.find_one({"egVector": {"$exists": True}})
-        vector = sample["egVector"]
+        sample = collection.find_one({os.getenv("VECTORIZED_FIELD_NAME"): {"$exists": True}})
+        vector = sample[os.getenv("VECTORIZED_FIELD_NAME")]
         print(f"Vector dimensions: {len(vector)}")
         print(f"Sample movie: {sample.get('title', 'Unknown')}")
         return True

@@ -74,32 +74,45 @@ class MDBContextRetriever(BaseRetriever):
         query_embedding = self.embeddings.embed_query(query)
         
         # Debug the embedding structure
-        print(f"Raw embedding type: {type(query_embedding)}")
-        print(f"Raw embedding: {query_embedding[:2] if hasattr(query_embedding, '__len__') else query_embedding}")
+        # print(f"Raw embedding type: {type(query_embedding)}")
+        # print(f"Raw embedding: {query_embedding[:2] if hasattr(query_embedding, '__len__') else query_embedding}")
         
-        # Handle triple-nested array structure [[[vector]]]
-        while isinstance(query_embedding, list) and len(query_embedding) == 1 and isinstance(query_embedding[0], list):
-            query_embedding = query_embedding[0]
+        # Handle nested array structures - flatten completely
+        def flatten_embedding(embedding):
+            if isinstance(embedding, list):
+                if len(embedding) == 1 and isinstance(embedding[0], list):
+                    return flatten_embedding(embedding[0])
+                elif all(isinstance(x, (int, float)) for x in embedding):
+                    return embedding
+                elif len(embedding) > 0 and isinstance(embedding[0], list):
+                    return flatten_embedding(embedding[0])
+            return embedding
+        
+        query_embedding = flatten_embedding(query_embedding)
         
         # Convert all elements to float
         try:
+            if not isinstance(query_embedding, list):
+                return self._simple_search(query)
             query_embedding = [float(x) for x in query_embedding]
             print(f"Query embedding length: {len(query_embedding)}")
+            
+            if len(query_embedding) == 0:
+                return self._simple_search(query)
+                
         except (ValueError, TypeError) as e:
             print(f"Error converting embedding to float: {e}")
-            print(f"Problematic embedding structure: {query_embedding[:5]}")
             return self._simple_search(query)
         
-        # Use the older $search syntax for kNN vector search
+        # Use $vectorSearch syntax like MongoDB Atlas Search Tester
         pipeline = [
             {
-                "$search": {
+                "$vectorSearch": {
                     "index": mongo_index,
-                    "knnBeta": {
-                        "vector": query_embedding,
-                        "path": "egVector",
-                        "k": self.k
-                    }
+                    "path": os.getenv("VECTORIZED_FIELD_NAME"),
+                    "queryVector": query_embedding,
+                    "numCandidates": 100,
+                    "limit": self.k
                 }
             },
             {
@@ -107,25 +120,31 @@ class MDBContextRetriever(BaseRetriever):
                     "_id": 1,
                     "fullplot": 1,
                     "title": 1,
-                    "score": {"$meta": "searchScore"}
+                    "score": {"$meta": "vectorSearchScore"}
                 }
             }
         ]
         
         try:
+            print(f"Using index: {mongo_index}")
             results = list(self.collection.aggregate(pipeline))
             docs = []
             for result in results:
+                raw_score = result.get("score", 0)
+                print(f"Raw result: {result.get('title')} - Score: {raw_score}")
                 doc = Document(
                     page_content=result.get("fullplot", ""),
                     metadata={
                         "title": result.get("title", ""),
-                        "score": result.get("score", 0),
+                        "score": raw_score,
                         "_id": str(result.get("_id", ""))
                     }
                 )
                 docs.append(doc)
-            print(f"Found {len(docs)} documents")
+            print(f"Vector search found {len(docs)} documents")
+            if len(docs) == 0:
+                print("Vector search returned 0 results")
+                return self._simple_search(query)
             return docs
         except Exception as e:
             print(f"Vector search failed: {e}")
