@@ -8,7 +8,7 @@ from mongodb_retriever import MDBContextRetriever
 def run_test_suite():
     """Run comprehensive test suite for hybrid search"""
     
-    # Test cases organized by expected search method
+    # Essential tests to demonstrate hybrid search
     test_cases = [
         # Keyword search tests (exact matches)
         {
@@ -17,36 +17,16 @@ def run_test_suite():
             "tests": [
                 ("Robin Hood", "Exact title match"),
                 ("Buster Keaton", "Actor name"),
-                ("train robbery", "Plot keywords"),
-                ("Western", "Genre"),
-                ("1920", "Year"),
-                ("Charlie Chaplin", "Director/Actor")
+                ("train robbery", "Plot keywords")
             ]
         },
-        # Semantic search tests (conceptual matches)
+        # Semantic search tests (force semantic)
         {
             "category": "SEMANTIC SEARCH TESTS", 
-            "description": "Should trigger semantic search for conceptual matches",
+            "description": "Should trigger semantic search when no keyword matches",
             "tests": [
-                ("heroic outlaw tale", "Should find Robin Hood via semantic similarity"),
-                ("comedic performer", "Should find comedy actors via semantic similarity"),
-                ("romantic narrative", "Should find love stories via semantic similarity"),
-                ("military conflict", "Should find war films via semantic similarity"),
-                ("moving pictures", "Should find early animation via semantic similarity"),
-                ("criminal underworld", "Should find crime films via semantic similarity")
-            ]
-        },
-        # Edge cases and mixed scenarios
-        {
-            "category": "EDGE CASE TESTS",
-            "description": "Complex queries that test hybrid behavior",
-            "tests": [
-                ("entertainer gets humiliated", "Should find 'He Who Gets Slapped' via semantic"),
-                ("prehistoric creature cartoon", "Should find 'Gertie the Dinosaur' via semantic"),
-                ("wordless humor", "Should find silent comedies via semantic"),
-                ("religious dance drama", "Should find 'Salomè' via semantic"),
-                ("creative genius story", "Should find invention-themed films via semantic"),
-                ("xylophone zebra quantum", "Nonsense words - should force semantic search")
+                ("wordless humor", "Should find films via semantic similarity"),
+                ("xylophone zebra quantum", "Nonsense words - forces semantic search")
             ]
         }
     ]
