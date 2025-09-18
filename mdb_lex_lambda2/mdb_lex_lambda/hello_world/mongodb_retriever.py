@@ -104,15 +104,16 @@ class MDBContextRetriever(BaseRetriever):
             print(f"Error converting embedding to float: {e}")
             return self._simple_search(query)
         
-        # Use $vectorSearch syntax like MongoDB Atlas Search Tester
+        # Use exact $vectorSearch syntax matching MongoDB Atlas Search Tester
         pipeline = [
             {
                 "$vectorSearch": {
                     "index": mongo_index,
                     "path": os.getenv("VECTORIZED_FIELD_NAME"),
                     "queryVector": query_embedding,
-                    "numCandidates": 100,
-                    "limit": self.k
+                    "numCandidates": 150,  # Match Atlas Search Tester default
+                    "limit": self.k,
+                    "filter": {}  # Empty filter like Atlas Search Tester
                 }
             },
             {
@@ -120,6 +121,9 @@ class MDBContextRetriever(BaseRetriever):
                     "_id": 1,
                     "fullplot": 1,
                     "title": 1,
+                    "genres": 1,
+                    "cast": 1,
+                    "year": 1,
                     "score": {"$meta": "vectorSearchScore"}
                 }
             }
@@ -127,6 +131,7 @@ class MDBContextRetriever(BaseRetriever):
         
         try:
             print(f"Using index: {mongo_index}")
+            # print(f"Pipeline: {pipeline}")
             results = list(self.collection.aggregate(pipeline))
             docs = []
             for result in results:
@@ -148,7 +153,47 @@ class MDBContextRetriever(BaseRetriever):
             return docs
         except Exception as e:
             print(f"Vector search failed: {e}")
-            return self._simple_search(query)
+            print("Trying fallback knnBeta syntax...")
+            # Fallback to knnBeta
+            fallback_pipeline = [
+                {
+                    "$search": {
+                        "index": mongo_index,
+                        "knnBeta": {
+                            "vector": query_embedding,
+                            "path": os.getenv("VECTORIZED_FIELD_NAME"),
+                            "k": self.k
+                        }
+                    }
+                },
+                {
+                    "$project": {
+                        "_id": 1,
+                        "fullplot": 1,
+                        "title": 1,
+                        "score": {"$meta": "searchScore"}
+                    }
+                }
+            ]
+            try:
+                results = list(self.collection.aggregate(fallback_pipeline))
+                docs = []
+                for result in results:
+                    raw_score = result.get("score", 0)
+                    print(f"Fallback result: {result.get('title')} - Score: {raw_score}")
+                    doc = Document(
+                        page_content=result.get("fullplot", ""),
+                        metadata={
+                            "title": result.get("title", ""),
+                            "score": raw_score,
+                            "_id": str(result.get("_id", ""))
+                        }
+                    )
+                    docs.append(doc)
+                return docs
+            except Exception as e2:
+                print(f"Fallback also failed: {e2}")
+                return self._simple_search(query)
 
     def _simple_search(self, query: str) -> List[Document]:
         """Simple search fallback"""
