@@ -11,6 +11,12 @@ This repository demonstrates how to vectorize the data using the Amazon SageMake
   
   [MongoDB Atlas Databse](https://www.mongodb.com/docs/atlas/getting-started/) with [Sample Data](https://www.mongodb.com/docs/atlas/sample-data/) 
 
+  Get sample data from `movies.json` by executing
+  ```bash
+cd mdb_lex_lambda2/mdb_lex_lambda/util
+mongoimport --uri "mongodb+srv://<username>:<password>@<cluster>.mongodb.net/my_mflix" --collection=movies --file=movies.json
+```
+
 ## Steps
 
 ### Update the environment variable for ATLAS_URI
@@ -21,7 +27,7 @@ This repository demonstrates how to vectorize the data using the Amazon SageMake
 Generate the vector embedding(egVector) for fullplot field in sample_mflix.movies collection
 
     cd mdb_lex_lambda2/mdb_lex_lambda/util
-    python3 mongodb_vectorization_search.py
+    python mongodb_vectorization_search.py
 
 ### Create Index
 

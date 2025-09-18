@@ -55,8 +55,7 @@ def query_endpoint_with_json_payload(encoded_json):
 # Parse and return model response
 def parse_response_multiple_texts(query_response):
     model_predictions = json.loads(query_response['Body'].read())
-    embeddings = model_predictions['embedding']
-    return embeddings
+    return model_predictions
 
 i = 0
 # Loop over all documents
@@ -68,7 +67,7 @@ for document in documents:
  ##########################################################################
  # This code to be used if the schema is flat    
     if field_name_to_be_vectorized in document and vectorized_field_name not in document:
-        payload = {"text_inputs": [document[field_name_to_be_vectorized]]}
+        payload = {"inputs": [document[field_name_to_be_vectorized]]}
         query_response = query_endpoint_with_json_payload(json.dumps(payload).encode('utf-8'))
         embeddings = parse_response_multiple_texts(query_response)
         # print("embeddings: " + str(embeddings[0]))
@@ -87,47 +86,57 @@ print("finished processing: " + str(i) + " records")
 print(newline + bold+ "Vector index to be created manually. Please ensure vector search index ~ " + index_name + "  ~ is created in MongoDB Atlas "+ unbold + newline)
 
 #Query based on the vector
-
-payload = {"text_inputs": [search_variable]}
+payload = {"inputs": [search_variable]}
 query_response = query_endpoint_with_json_payload(json.dumps(payload).encode('utf-8'))
 embeddings = parse_response_multiple_texts(query_response)
 
-#print(newline + "embeddings:" + str(embeddings[0]) + newline)
+# Debug the embeddings structure
+print("Raw embeddings:", embeddings)
+print("Embeddings type:", type(embeddings))
+if isinstance(embeddings, list):
+    print("Embeddings length:", len(embeddings))
+    if len(embeddings) > 0:
+        print("First element type:", type(embeddings[0]))
+        print("First element:", embeddings[0])
+        if isinstance(embeddings[0], list) and len(embeddings[0]) > 0:
+            print("First vector element type:", type(embeddings[0][0]))
+            print("First few vector values:", embeddings[0][:5])
 
-    
-# get the vector search results based on the filter conditions.
+# Ensure we have a proper numeric vector
+if isinstance(embeddings, list) and len(embeddings) > 0:
+    vector_for_search = embeddings[0]
+    if isinstance(vector_for_search, list):
+        # Convert all elements to float and filter out any non-numeric values
+        try:
+            vector_for_search = [float(x) for x in vector_for_search if x is not None]
+            print("Converted vector length:", len(vector_for_search))
+            print("First few converted values:", vector_for_search[:5])
+        except (ValueError, TypeError) as e:
+            print("Error converting vector elements:", e)
+            print("Problematic elements:", [x for x in vector_for_search if not isinstance(x, (int, float))][:5])
+            exit(1)
+    else:
+        print("Vector is not a list, got:", type(vector_for_search))
+        exit(1)
+else:
+    print("Embeddings structure is unexpected")
+    exit(1)
 
+# Test the vector search
 response = collection.aggregate([
-        {
-            '$search': {
-                'index': index_name, 
-                'knnBeta': {
-                    'vector': embeddings[0], 
-                    'path': vectorized_field_name, 
-                    'k': 3,
-                }
-            }
-        }, {
-            '$project': {
-                'score': {'$meta': 'searchScore'}, 
-                field_name_to_be_vectorized : 1
+    {
+        '$search': {
+            'index': index_name, 
+            'knnBeta': {
+                'vector': vector_for_search, 
+                'path': vectorized_field_name, 
+                'k': 3,
             }
         }
-    ])
-
-
-
-# Result is a list of docs with the array fields
-docs = list(response)
-
-print(newline + "Vector Search Criteria:  "+ str(search_variable)+ newline)
-
-#print(newline + "Vector Search Result: "+ str(docs)+ newline)
-
-# Extract an array field from the docs
-array_field = [doc[field_name_to_be_vectorized] for doc in docs]
-
-# Join array elements into a string  
-llm_input_text = '\n \n'.join(str(elem) for elem in array_field)
-
-print(newline + bold + 'Given Input : ' +  unbold + newline + llm_input_text + newline )
+    }, {
+        '$project': {
+            'score': {'$meta': 'searchScore'}, 
+            field_name_to_be_vectorized : 1
+        }
+    }
+])

@@ -22,7 +22,7 @@ Resources:
         Variables:
           LLM_ENDPOINT: "jumpstart-dft-hf-text2text-flan-t5-xl"
           AWS_REGION1: "us-east-1"
-          ATLAS_URI: "mongodb+srv://<USERNAME>:<PASSWORD>@<SERVER>.mongodb.net/?retryWrites=true&w=majority"
+          ATLAS_URI: "mongodb+srv://wenhao1223:1223@cluster0.jfdxrvr.mongodb.net/?retryWrites=true&w=majority"
           MONGO_DB: "sample_mflix"
           MONGO_COLLECTION: "movies"
           MONGO_INDEX: "vector-index"
